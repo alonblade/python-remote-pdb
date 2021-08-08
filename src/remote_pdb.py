@@ -67,7 +67,9 @@ class RemotePdb(Pdb):
     """
     active_instance = None
 
-    def __init__(self, host, port, patch_stdstreams=False, quiet=False):
+    def __init__(self, host, port, patch_stdstreams=False, quiet=False,
+                filewrapper_constructor=LF2CRLF_FileWrapper,
+                acceptor=None):
         self._quiet = quiet
         listen_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         listen_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, True)
@@ -75,10 +77,12 @@ class RemotePdb(Pdb):
         if not self._quiet:
             cry("RemotePdb session open at %s:%s, waiting for connection ..." % listen_socket.getsockname())
         listen_socket.listen(1)
-        connection, address = listen_socket.accept()
+        if acceptor is None:
+            acceptor = lambda listen_socket: listen_socket.accept()
+        connection, address = acceptor(listen_socket)
         if not self._quiet:
             cry("RemotePdb accepted connection from %s." % repr(address))
-        self.handle = LF2CRLF_FileWrapper(connection)
+        self.handle = filewrapper_constructor(connection)
         Pdb.__init__(self, completekey='tab', stdin=self.handle, stdout=self.handle)
         self.backup = []
         if patch_stdstreams:
